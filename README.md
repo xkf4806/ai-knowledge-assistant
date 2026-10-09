@@ -64,18 +64,18 @@ src/main/resources
 
 > 想换成 DeepSeek 官方 API？见下面「切换模型供应商」。
 
-### 2. 配置环境变量（Windows PowerShell）
+### 2. 配置环境变量
 
-```powershell
-$env:AI_API_KEY = "sk-你的真实key"
+```bash
+export AI_API_KEY="sk-你的真实key"
 ```
 
 也可以直接用命令行参数或修改 `application.yml`（不建议把 Key 提交到 Git）。
 
 ### 3. 启动
 
-```powershell
-.\build.ps1 spring-boot:run
+```bash
+./build.sh spring-boot:run
 ```
 
 看到 `Started AiKnowledgeAssistantApplication` 即启动成功，默认端口 `8080`。
@@ -84,47 +84,46 @@ $env:AI_API_KEY = "sk-你的真实key"
 
 先测健康检查（不需要 Key）：
 
-```powershell
-Invoke-RestMethod http://localhost:8080/api/ping
+```bash
+curl http://localhost:8080/api/ping
 ```
 
 再测基础对话连通性：
 
-```powershell
-Invoke-RestMethod -Method Post http://localhost:8080/api/chat `
-  -ContentType "application/json" `
-  -Body '{"message":"用一句话介绍你自己"}'
+```bash
+curl -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"用一句话介绍你自己"}'
 ```
 
 导入示例知识库（这一步会调用 Embedding 接口）：
 
-```powershell
-Invoke-RestMethod -Method Post http://localhost:8080/api/rag/ingest
+```bash
+curl -X POST http://localhost:8080/api/rag/ingest
 ```
 
 基于知识库提问：
 
-```powershell
-Invoke-RestMethod -Method Post http://localhost:8080/api/rag/ask `
-  -ContentType "application/json" `
-  -Body '{"question":"无理由退货的期限是几天？运费谁承担？"}'
+```bash
+curl -X POST http://localhost:8080/api/rag/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"无理由退货的期限是几天？运费谁承担？"}'
 ```
 
 返回里 `answer` 是答案，`sources` 是命中的文档片段来源。
 
 上传一份自己的文档（PDF / Word / Markdown / txt 等）并索引：
 
-```powershell
-# 用 curl.exe 传 multipart（Windows 10+ 自带；PowerShell 5.1 的 Invoke-RestMethod 不支持 -Form）
-curl.exe -X POST http://localhost:8080/api/rag/upload `
-  -F "file=@C:\path\to\你的文档.pdf" -F "strategy=heading"
+```bash
+curl -X POST http://localhost:8080/api/rag/upload \
+  -F "file=@/path/to/你的文档.pdf" -F "strategy=heading"
 ```
 
 只想看看不同分块策略怎么切？用 `preview`，它**不调用 embedding、不花钱**：
 
-```powershell
-curl.exe -X POST http://localhost:8080/api/rag/preview `
-  -F "file=@C:\path\to\你的文档.pdf" -F "strategies=fixed,heading,paragraph" -F "chunkSize=200"
+```bash
+curl -X POST http://localhost:8080/api/rag/preview \
+  -F "file=@/path/to/你的文档.pdf" -F "strategies=fixed,heading,paragraph" -F "chunkSize=200"
 ```
 
 ## 接口一览
@@ -161,14 +160,14 @@ curl.exe -X POST http://localhost:8080/api/rag/preview `
 
 `/api/rag/preview` 只做解析 + 分块，不调用 embedding，可以反复调参看效果：
 
-```powershell
+```bash
 # 一次对比三种策略
-curl.exe -X POST http://localhost:8080/api/rag/preview `
-  -F "file=@C:\path\to\员工手册.docx" -F "strategies=fixed,heading,paragraph"
+curl -X POST http://localhost:8080/api/rag/preview \
+  -F "file=@/path/to/员工手册.docx" -F "strategies=fixed,heading,paragraph"
 
 # 固定长度策略下对比不同 chunkSize
-curl.exe -X POST http://localhost:8080/api/rag/preview `
-  -F "file=@C:\path\to\员工手册.docx" -F "strategies=fixed" -F "chunkSize=150" -F "overlap=30"
+curl -X POST http://localhost:8080/api/rag/preview \
+  -F "file=@/path/to/员工手册.docx" -F "strategies=fixed" -F "chunkSize=150" -F "overlap=30"
 ```
 
 返回里每个策略含 `chunkCount` 与逐条 `chunks`（`index` / `heading` / `length` / `preview`），
@@ -219,7 +218,7 @@ curl.exe -X POST http://localhost:8080/api/rag/preview `
 
 ## 常见问题
 
-- **启动报 API Key 错误**：确认 `$env:AI_API_KEY` 已设置，且重启了应用。
+- **启动报 API Key 错误**：确认 `AI_API_KEY` 已设置（如 `export AI_API_KEY=sk-...`），且重启了应用。
 - **调用报 401/403**：Key 无效或额度不足。
 - **调用报 404 或模型不存在**：`AI_CHAT_MODEL` / `AI_EMBEDDING_MODEL` 与所用网关的模型名不匹配。
 - **重启后检索不到内容**：内存向量库重启即清空，需要重新调用 `/api/rag/ingest`（第 3 周换成 pgvector 后即可持久化）。
