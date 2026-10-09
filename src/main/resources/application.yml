@@ -2,6 +2,11 @@ server:
   port: 8080
 
 spring:
+  servlet:
+    multipart:
+      # 第 2 周支持上传真实文档，PDF/Word 会比纯文本大，适当放宽上传限制。
+      max-file-size: 20MB
+      max-request-size: 20MB
   application:
     name: ai-knowledge-assistant
   ai:
@@ -26,5 +31,7 @@ app:
   rag:
     chunk-size: 300
     chunk-overlap: 50
+    # 第 2 周新增：fixed（固定长度）/ heading（按标题层级）/ paragraph（按段落合并）
+    chunk-strategy: heading
     top-k: 4
-    sample-docs: classpath:sample-docs/*.md
+    sample-docs: classpath:sample-docs/*

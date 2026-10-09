@@ -19,7 +19,7 @@ public class PingController {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "UP");
         body.put("app", "ai-knowledge-assistant");
-        body.put("week", 1);
+        body.put("week", 2);
         return body;
     }
 }

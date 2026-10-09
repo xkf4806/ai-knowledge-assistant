@@ -70,7 +70,10 @@ public class RagService {
         List<SourceRef> sources = hits.stream()
                 .map(d -> new SourceRef(
                         String.valueOf(d.getMetadata().get("source")),
-                        String.valueOf(d.getMetadata().get("chunk"))))
+                        String.valueOf(d.getMetadata().get("chunk")),
+                        d.getMetadata().get("heading") == null
+                                ? null
+                                : String.valueOf(d.getMetadata().get("heading"))))
                 .collect(Collectors.toList());
 
         return new RagAnswer(answer, sources);
