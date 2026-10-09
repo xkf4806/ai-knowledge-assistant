@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-knowledge-assistant
+  ai:
+    openai:
+      # Spring AI 的 base-url 使用「根地址」，不要带 /v1（客户端会自己拼接 /v1/...）。
+      # 默认指向硅基流动：一个同时提供「对话」和「Embedding」的 OpenAI 兼容网关，
+      # 默认对话模型就是 DeepSeek，一个 Key 即可跑通全链路。
+      #
+      # 若想改用 DeepSeek 官方 API（https://api.deepseek.com）：它只提供对话、不提供
+      # Embedding，需要另配一个 Embedding 服务（见 README「切换模型供应商」一节）。
+      base-url: ${AI_BASE_URL:https://api.siliconflow.cn}
+      api-key: ${AI_API_KEY:sk-change-me}
+      chat:
+        options:
+          model: ${AI_CHAT_MODEL:deepseek-ai/DeepSeek-V3}
+          temperature: 0.7
+      embedding:
+        options:
+          model: ${AI_EMBEDDING_MODEL:BAAI/bge-m3}
+
+app:
+  rag:
+    chunk-size: 300
+    chunk-overlap: 50
+    top-k: 4
+    sample-docs: classpath:sample-docs/*.md
