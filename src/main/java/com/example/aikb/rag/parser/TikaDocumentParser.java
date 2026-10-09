@@ -1,9 +1,8 @@
 package com.example.aikb.rag.parser;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -16,10 +15,9 @@ import java.util.TreeSet;
  * 基于 Apache Tika 的解析器：由 Tika 自动探测格式并抽取纯文本，
  * 覆盖第 2 周要求的 PDF / Word / Markdown，也顺带支持 HTML、txt、Excel、PPT 等。
  */
+@Slf4j
 @Component
 public class TikaDocumentParser implements DocumentParser {
-
-    private static final Logger log = LoggerFactory.getLogger(TikaDocumentParser.class);
 
     /** 用 TreeSet 保证报错信息里的格式顺序稳定、方便阅读 */
     private static final Set<String> SUPPORTED_EXTENSIONS = new TreeSet<>(Set.of(

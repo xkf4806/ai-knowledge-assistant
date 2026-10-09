@@ -1,38 +1,55 @@
 package com.example.aikb.rag;
 
+import com.example.aikb.chat.ConversationMemoryService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * 最小 RAG 链路：检索（向量相似度） -> 拼装上下文 -> 交给大模型生成答案。
- * 这里手写检索与拼装，是为了让第 1 周看清 RAG 的每一步。
+ * RAG 问答编排：多轮记忆 + 向量检索 + 拼装带编号的上下文 + 生成答案 + 引用校验。
+ *
+ * <p>第 3 周在原来「检索 → 生成」的基础上补了三件事：
+ * <ul>
+ *   <li>检索交给 {@link RetrievalService}，命中的片段带来源、分数与「第几段」；</li>
+ *   <li>上下文里给每段资料编号 {@code [1]、[2]}，提示模型在答案里标注引用；</li>
+ *   <li>把每一轮问答写进 {@link ConversationMemoryService}，下次提问自动带上历史。</li>
+ * </ul>
  */
+@Slf4j
 @Service
 public class RagService {
 
     /** 系统提示词放在资源文件里，显式按 UTF-8 读取，避免依赖源码编码与文本块语法。 */
     private static final String SYSTEM_PROMPT_RESOURCE = "prompts/system-prompt.txt";
 
+    /** 检索不到资料时的兜底回答，避免模型自由发挥。 */
+    private static final String NO_ANSWER = "根据现有资料无法回答该问题。";
+
+    /** 匹配答案里的引用编号，如 [1]、[12] */
+    private static final Pattern CITATION = Pattern.compile("\\[(\\d+)]");
+
     private final ChatClient chatClient;
-    private final VectorStore vectorStore;
-    private final RagProperties properties;
+    private final RetrievalService retrievalService;
+    private final ConversationMemoryService memory;
     private final String systemPrompt;
 
-    public RagService(ChatClient.Builder chatClientBuilder, VectorStore vectorStore, RagProperties properties) {
+    public RagService(ChatClient.Builder chatClientBuilder,
+                      RetrievalService retrievalService,
+                      ConversationMemoryService memory) {
         this.chatClient = chatClientBuilder.build();
-        this.vectorStore = vectorStore;
-        this.properties = properties;
+        this.retrievalService = retrievalService;
+        this.memory = memory;
         this.systemPrompt = loadSystemPrompt();
     }
 
@@ -45,37 +62,71 @@ public class RagService {
         }
     }
 
-    public RagAnswer ask(String question) {
-        List<Document> hits = vectorStore.similaritySearch(
-                SearchRequest.builder().query(question).topK(properties.getTopK()).build());
+    public RagAnswer ask(AskRequest request) {
+        String question = request.getQuestion();
+        String sessionId = memory.resolveSessionId(request.getSessionId());
+        List<Message> history = memory.history(sessionId);
 
-        if (hits == null || hits.isEmpty()) {
-            return new RagAnswer("根据现有资料无法回答该问题。", Collections.emptyList());
+        List<RetrievedChunk> hits = retrievalService.retrieve(question, request.getSource());
+        if (hits.isEmpty()) {
+            memory.record(sessionId, question, NO_ANSWER);
+            return new RagAnswer(sessionId, NO_ANSWER, List.of(), List.of(), memory.turnCount(sessionId));
         }
 
-        StringBuilder context = new StringBuilder();
-        for (int i = 0; i < hits.size(); i++) {
-            context.append("[").append(i + 1).append("] ")
-                   .append(hits.get(i).getText())
-                   .append("\n");
-        }
-
-        String prompt = "【参考资料】\n" + context + "\n【问题】\n" + question;
+        String prompt = buildPrompt(question, hits);
         String answer = chatClient.prompt()
                 .system(systemPrompt)
+                .messages(history)
                 .user(prompt)
                 .call()
                 .content();
 
-        List<SourceRef> sources = hits.stream()
-                .map(d -> new SourceRef(
-                        String.valueOf(d.getMetadata().get("source")),
-                        String.valueOf(d.getMetadata().get("chunk")),
-                        d.getMetadata().get("heading") == null
-                                ? null
-                                : String.valueOf(d.getMetadata().get("heading"))))
-                .collect(Collectors.toList());
+        List<Integer> citations = extractCitations(answer, hits.size());
+        List<SourceRef> sources = hits.stream().map(RetrievedChunk::sourceRef).toList();
 
-        return new RagAnswer(answer, sources);
+        memory.record(sessionId, question, answer);
+        return new RagAnswer(sessionId, answer, sources, citations, memory.turnCount(sessionId));
+    }
+
+    /** 把命中片段拼成带编号与来源的参考资料，让模型既能答对、也能标注引用。 */
+    private static String buildPrompt(String question, List<RetrievedChunk> hits) {
+        StringBuilder prompt = new StringBuilder("【参考资料】\n");
+        for (RetrievedChunk hit : hits) {
+            SourceRef source = hit.sourceRef();
+            prompt.append(hit.label());
+            if (source != null && source.getLocation() != null) {
+                prompt.append("（来源：").append(source.getLocation()).append("）");
+            }
+            prompt.append("\n").append(hit.text()).append("\n\n");
+        }
+        prompt.append("【问题】\n").append(question).append("\n\n")
+              .append("请只依据上面的参考资料回答，并在句末用 [1]、[2] 这样的编号标注引用的资料。")
+              .append("如果资料里没有答案，直接回答「").append(NO_ANSWER).append("」。");
+        return prompt.toString();
+    }
+
+    /**
+     * 解析答案里的引用编号并校验范围：只保留真实存在的编号，
+     * 越界编号说明模型编造了来源，记一条告警日志，方便第 4 周做幻觉监测。
+     */
+    static List<Integer> extractCitations(String answer, int maxIndex) {
+        if (answer == null || answer.isBlank()) {
+            return List.of();
+        }
+        TreeSet<Integer> valid = new TreeSet<>();
+        List<Integer> invalid = new ArrayList<>();
+        Matcher matcher = CITATION.matcher(answer);
+        while (matcher.find()) {
+            int index = Integer.parseInt(matcher.group(1));
+            if (index >= 1 && index <= maxIndex) {
+                valid.add(index);
+            } else {
+                invalid.add(index);
+            }
+        }
+        if (!invalid.isEmpty()) {
+            log.warn("答案出现了不存在的引用编号 {}（有效范围 1-{}），疑似幻觉引用", invalid, maxIndex);
+        }
+        return List.copyOf(valid);
     }
 }

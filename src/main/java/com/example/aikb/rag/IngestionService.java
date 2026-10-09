@@ -6,8 +6,7 @@ import com.example.aikb.rag.splitter.ChunkingOptions;
 import com.example.aikb.rag.splitter.ChunkingStrategy;
 import com.example.aikb.rag.splitter.TextChunk;
 import com.example.aikb.rag.splitter.TextSplitter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.Resource;
@@ -25,10 +24,9 @@ import java.util.Map;
  * 文档摄取：解析文档 -> 分块 -> 批量写入向量库。
  * 第 2 周支持 PDF / Word / Markdown 等多格式，并把分块策略做成可配置参数。
  */
+@Slf4j
 @Service
 public class IngestionService {
-
-    private static final Logger log = LoggerFactory.getLogger(IngestionService.class);
 
     /** 预览片段截断长度，够看清切分边界即可 */
     private static final int PREVIEW_LENGTH = 80;
@@ -126,11 +124,20 @@ public class IngestionService {
     }
 
     private IngestResponse index(List<Document> documents, List<String> sources, ChunkingOptions options) {
+        // 第 3 周：按来源先删后写，保证重复导入同一文档时是「替换」而不是「叠加」，
+        // 否则同一份文档会被索引多遍，检索结果里出现大量重复片段。
+        for (String source : sources) {
+            vectorStore.delete("source == '" + escape(source) + "'");
+        }
         if (!documents.isEmpty()) {
             // 一次性批量写入，Spring AI 会对片段做批量 embedding，减少接口调用次数。
             vectorStore.add(documents);
         }
         log.info("已索引 {} 个文档、{} 个片段，策略={}", sources.size(), documents.size(), options.strategy());
         return new IngestResponse(sources.size(), documents.size(), options.strategy().wireName(), sources);
+    }
+
+    private static String escape(String value) {
+        return value == null ? "" : value.replace("'", "''");
     }
 }

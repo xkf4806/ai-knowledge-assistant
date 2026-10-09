@@ -24,6 +24,15 @@ public class RagProperties {
     /** 示例文档位置，支持 Spring Resource 通配符 */
     private String sampleDocs = "classpath:sample-docs/*";
 
+    /** 向量库实现：memory（默认，内存）/ pgvector（持久化） */
+    private VectorStoreType vectorStore = VectorStoreType.MEMORY;
+
+    /** embedding 维度，需与所用 embedding 模型一致（BAAI/bge-m3 为 1024） */
+    private int embeddingDimensions = 1024;
+
+    /** pgvector 表名，Schema 由 PgVectorStore 自动初始化 */
+    private String vectorTableName = "ai_kb_vectors";
+
     /**
      * 把接口传入的可选参数解析成一次分块参数，缺省时回落到 application.yml 的配置。
      * 只给 chunkSize 而没给 overlap 时，把重叠长度收窄到 chunkSize 以内，避免误报参数错误。

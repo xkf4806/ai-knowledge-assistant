@@ -1,0 +1,28 @@
+# 第 3 周：一键起一个带 pgvector 扩展的 PostgreSQL，用于持久化向量库演示。
+#
+#   docker compose up -d        # 启动
+#   docker compose down         # 停止（保留数据卷）
+#   docker compose down -v      # 停止并清空数据
+#
+# 启动后把应用切成 pgvector 实现：
+#   app.rag.vector-store=pgvector（或环境变量 AIKB_VECTOR_STORE=pgvector，见 README）
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: aikb-pgvector
+    environment:
+      POSTGRES_DB: aikb
+      POSTGRES_USER: aikb
+      POSTGRES_PASSWORD: aikb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aikb -d aikb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgvector-data:

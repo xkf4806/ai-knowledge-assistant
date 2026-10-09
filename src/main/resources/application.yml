@@ -7,6 +7,13 @@ spring:
       # 第 2 周支持上传真实文档，PDF/Word 会比纯文本大，适当放宽上传限制。
       max-file-size: 20MB
       max-request-size: 20MB
+  datasource:
+    # 第 3 周：pgvector 持久化向量库使用。默认走内存向量库（app.rag.vector-store=memory）时
+    # 不会真正建立连接；把 app.rag.vector-store 切成 pgvector 后才会用到这些连接信息。
+    # 本地可用仓库根目录的 docker-compose.yml 一键起一个带 pgvector 的 PostgreSQL。
+    url: ${AIKB_DB_URL:jdbc:postgresql://localhost:5432/aikb}
+    username: ${AIKB_DB_USERNAME:aikb}
+    password: ${AIKB_DB_PASSWORD:aikb}
   application:
     name: ai-knowledge-assistant
   ai:
@@ -35,3 +42,13 @@ app:
     chunk-strategy: heading
     top-k: 4
     sample-docs: classpath:sample-docs/*
+    # 第 3 周新增：memory（内存，默认）/ pgvector（持久化），可用环境变量覆盖
+    vector-store: ${AIKB_VECTOR_STORE:memory}
+    # 与 embedding 模型维度保持一致：BAAI/bge-m3 为 1024 维。换模型时这里要同步改。
+    embedding-dimensions: 1024
+    # pgvector 表名，Schema 由 PgVectorStore 自动初始化
+    vector-table-name: ai_kb_vectors
+  chat:
+    memory:
+      # 第 3 周新增：多轮对话记忆窗口，每个会话保留的最近消息条数（一问一答算 2 条）
+      max-messages: 10
