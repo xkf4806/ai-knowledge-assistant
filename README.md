@@ -57,10 +57,6 @@ src/main/resources
 
 ## 快速开始
 
-> **重要**：本项目需要 **JDK 17**。Maven 只认 `JAVA_HOME`，不看 PATH。
-> 如果你的 `mvn -v` 显示的 `Java version` 不是 17（例如是 1.8），请先看下面的
-> 「指定 JDK 17」一节，或用项目自带的 `.\build.ps1` 来构建。
-
 ### 1. 准备 API Key
 
 默认配置使用一个同时提供**对话**与 **Embedding** 的 OpenAI 兼容网关，默认对话模型就是 DeepSeek。
@@ -83,36 +79,6 @@ $env:AI_API_KEY = "sk-你的真实key"
 ```
 
 看到 `Started AiKnowledgeAssistantApplication` 即启动成功，默认端口 `8080`。
-
-## 指定 JDK 17（重要）
-
-Maven 通过 `JAVA_HOME` 决定用哪个 JDK。若你的系统 `JAVA_HOME` 指向 JDK 8，Maven 就会用 8 编译，
-从而报出「需要class、interface或enum」「不支持 记录」之类的语法错误。
-
-三种做法，任选其一：
-
-**方式一（推荐，只影响当前终端）：**
-
-```powershell
-$env:JAVA_HOME = "D:\Program Files\Java\jdk-17"
-mvn -v      # 确认 Java version 变成 17
-```
-
-**方式二（推荐，只影响本项目）：** 直接用项目自带脚本，自动切换 JDK 17：
-
-```powershell
-.\build.ps1 clean test
-.\build.ps1 spring-boot:run
-```
-
-**方式三（永久生效，当前用户级，无需管理员）：**
-
-```powershell
-[Environment]::SetEnvironmentVariable("JAVA_HOME", "D:\Program Files\Java\jdk-17", "User")
-```
-
-设置后**需要关闭并重开终端**。注意：这会让本机所有新开的终端都用 JDK 17；
-如果你还有依赖 JDK 8 的旧项目，改用方式一或方式二更稳妥。
 
 ### 4. 验证
 
@@ -253,9 +219,6 @@ curl.exe -X POST http://localhost:8080/api/rag/preview `
 
 ## 常见问题
 
-- **`mvn test` 报「需要class、interface或enum」或「不支持 记录/文本块」**：编译用的 JDK 版本不对。
-  本项目需要 JDK 17，请执行 `mvn -v` 确认 `Java version` 为 17；若不是，把 `JAVA_HOME` 指向 JDK 17 并重开终端。
-  项目已内置版本校验，JDK 低于 17 会直接给出明确提示。
 - **启动报 API Key 错误**：确认 `$env:AI_API_KEY` 已设置，且重启了应用。
 - **调用报 401/403**：Key 无效或额度不足。
 - **调用报 404 或模型不存在**：`AI_CHAT_MODEL` / `AI_EMBEDDING_MODEL` 与所用网关的模型名不匹配。
