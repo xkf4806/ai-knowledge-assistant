@@ -23,7 +23,8 @@ class IngestionServiceDedupeTest {
     void deletesExistingSourceBeforeWritingChunks() {
         VectorStore vectorStore = mock(VectorStore.class);
         IngestionService service = new IngestionService(
-                vectorStore, new RagProperties(), new TikaDocumentParser(), new TextSplitter());
+                vectorStore, new RagProperties(), new TikaDocumentParser(), new TextSplitter(),
+                new Bm25LexicalIndex());
 
         IngestResponse response = service.ingestSampleDocs(null, null, null);
 

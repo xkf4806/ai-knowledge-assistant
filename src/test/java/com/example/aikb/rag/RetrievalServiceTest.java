@@ -29,7 +29,8 @@ class RetrievalServiceTest {
                 .score(0.83125)
                 .build();
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(hit));
-        RetrievalService service = new RetrievalService(vectorStore, properties(4));
+        RetrievalService service = new RetrievalService(
+                vectorStore, properties(4), new Bm25LexicalIndex(), new RerankService(properties(4)));
 
         List<RetrievedChunk> chunks = service.retrieve("年假有几天", null);
 
@@ -53,7 +54,8 @@ class RetrievalServiceTest {
     void appliesSourceFilterAsMetadataExpression() {
         VectorStore vectorStore = mock(VectorStore.class);
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        RetrievalService service = new RetrievalService(vectorStore, properties(3));
+        RetrievalService service = new RetrievalService(
+                vectorStore, properties(3), new Bm25LexicalIndex(), new RerankService(properties(3)));
         ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
 
         service.retrieve("报销流程", "refund-policy.md");
@@ -69,7 +71,8 @@ class RetrievalServiceTest {
     void returnsEmptyWhenNothingMatches() {
         VectorStore vectorStore = mock(VectorStore.class);
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
-        RetrievalService service = new RetrievalService(vectorStore, properties(3));
+        RetrievalService service = new RetrievalService(
+                vectorStore, properties(3), new Bm25LexicalIndex(), new RerankService(properties(3)));
 
         assertThat(service.retrieve("不存在的问题", null)).isEmpty();
     }
@@ -77,6 +80,7 @@ class RetrievalServiceTest {
     private static RagProperties properties(int topK) {
         RagProperties properties = new RagProperties();
         properties.setTopK(topK);
+        properties.setRetrievalMode(RetrievalMode.VECTOR);
         return properties;
     }
 }

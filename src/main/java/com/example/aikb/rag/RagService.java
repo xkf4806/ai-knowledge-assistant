@@ -65,12 +65,17 @@ public class RagService {
     public RagAnswer ask(AskRequest request) {
         String question = request.getQuestion();
         String sessionId = memory.resolveSessionId(request.getSessionId());
+        RetrievalMode retrievalMode = request.getRetrievalMode() == null
+                || request.getRetrievalMode().isBlank()
+                ? null
+                : RetrievalMode.from(request.getRetrievalMode());
         List<Message> history = memory.history(sessionId);
 
-        List<RetrievedChunk> hits = retrievalService.retrieve(question, request.getSource());
+        List<RetrievedChunk> hits = retrievalService.retrieve(question, request.getSource(), retrievalMode);
         if (hits.isEmpty()) {
             memory.record(sessionId, question, NO_ANSWER);
-            return new RagAnswer(sessionId, NO_ANSWER, List.of(), List.of(), memory.turnCount(sessionId));
+            return new RagAnswer(sessionId, NO_ANSWER, List.of(), List.of(),
+                    memory.turnCount(sessionId), retrievalModeName(retrievalMode));
         }
 
         String prompt = buildPrompt(question, hits);
@@ -85,7 +90,14 @@ public class RagService {
         List<SourceRef> sources = hits.stream().map(RetrievedChunk::sourceRef).toList();
 
         memory.record(sessionId, question, answer);
-        return new RagAnswer(sessionId, answer, sources, citations, memory.turnCount(sessionId));
+        return new RagAnswer(sessionId, answer, sources, citations,
+                memory.turnCount(sessionId), retrievalModeName(retrievalMode));
+    }
+
+    private String retrievalModeName(RetrievalMode retrievalMode) {
+        return retrievalMode == null
+                ? "default"
+                : retrievalMode.wireName();
     }
 
     /** 把命中片段拼成带编号与来源的参考资料，让模型既能答对、也能标注引用。 */

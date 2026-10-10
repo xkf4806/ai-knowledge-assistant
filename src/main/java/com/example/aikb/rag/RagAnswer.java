@@ -1,6 +1,5 @@
 package com.example.aikb.rag;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,7 +10,6 @@ import java.util.List;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class RagAnswer {
 
     /** 会话 ID；下次带上它即可续上上下文 */
@@ -28,4 +26,21 @@ public class RagAnswer {
     /** 当前会话累计轮数（一问一答算一轮） */
     private int turns;
 
+    /** 本轮实际使用的检索模式 */
+    private String retrievalMode;
+
+    public RagAnswer(String sessionId, String answer, List<SourceRef> sources,
+                     List<Integer> citations, int turns) {
+        this(sessionId, answer, sources, citations, turns, null);
+    }
+
+    public RagAnswer(String sessionId, String answer, List<SourceRef> sources,
+                     List<Integer> citations, int turns, String retrievalMode) {
+        this.sessionId = sessionId;
+        this.answer = answer;
+        this.sources = sources;
+        this.citations = citations;
+        this.turns = turns;
+        this.retrievalMode = retrievalMode;
+    }
 }

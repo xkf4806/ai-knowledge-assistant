@@ -1,0 +1,210 @@
+[
+  {
+    "id": "hr-annual-leave-days",
+    "question": "入职满一年有几天带薪年假？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "年假",
+    "expectedKeywords": ["10 天", "带薪年假"],
+    "referenceAnswer": "入职满 1 年的员工每年享有 10 天带薪年假。"
+  },
+  {
+    "id": "hr-annual-leave-increase",
+    "question": "员工工作满三年后，年假会怎么增加？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "年假",
+    "expectedKeywords": ["满 3 年", "每满 1 年", "增加 1 天"],
+    "referenceAnswer": "满 3 年后每满 1 年增加 1 天年假。"
+  },
+  {
+    "id": "hr-annual-leave-cap",
+    "question": "公司年假最多有多少天？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "年假",
+    "expectedKeywords": ["上限", "15 天"],
+    "referenceAnswer": "员工年假上限为 15 天。"
+  },
+  {
+    "id": "hr-flexible-core-hours",
+    "question": "研发弹性工作制的核心工作时间是什么？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "弹性工作",
+    "expectedKeywords": ["10:30", "17:00", "核心工作时间"],
+    "referenceAnswer": "核心工作时间为 10:30 至 17:00。"
+  },
+  {
+    "id": "hr-flexible-daily-hours",
+    "question": "研发岗位弹性工作每天至少工作多久？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "弹性工作",
+    "expectedKeywords": ["不少于 8 小时"],
+    "referenceAnswer": "每日工作时长不少于 8 小时。"
+  },
+  {
+    "id": "hr-reimbursement-deadline",
+    "question": "差旅费用需要在行程结束后几天内提交报销？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "报销流程",
+    "expectedKeywords": ["15 个工作日", "报销单"],
+    "referenceAnswer": "差旅费用需在行程结束后 15 个工作日内提交报销单。"
+  },
+  {
+    "id": "hr-reimbursement-approval",
+    "question": "报销单需要经过谁审批？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "报销流程",
+    "expectedKeywords": ["直属主管", "财务审批"],
+    "referenceAnswer": "报销单经直属主管与财务审批后打款。"
+  },
+  {
+    "id": "hr-probation-duration",
+    "question": "一般岗位试用期是多久？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "试用期",
+    "expectedKeywords": ["3 个月"],
+    "referenceAnswer": "一般岗位试用期为 3 个月。"
+  },
+  {
+    "id": "hr-probation-salary",
+    "question": "试用期工资是转正后的多少？",
+    "expectedSource": "employee-handbook.md",
+    "expectedHeading": "试用期",
+    "expectedKeywords": ["90%"],
+    "referenceAnswer": "试用期薪资为转正后薪资的 90%。"
+  },
+  {
+    "id": "refund-return-window",
+    "question": "无理由退货的期限是几天？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "适用条件",
+    "expectedKeywords": ["7 个自然日", "不影响二次销售"],
+    "referenceAnswer": "收到商品后 7 个自然日内且不影响二次销售可以无理由退货。"
+  },
+  {
+    "id": "refund-return-window-received",
+    "question": "客户收到货后多久可以申请无理由退货？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "适用条件",
+    "expectedKeywords": ["7 个自然日"],
+    "referenceAnswer": "收到商品后 7 个自然日内。"
+  },
+  {
+    "id": "refund-return-exclusions",
+    "question": "哪些商品不支持七天无理由退货？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "不支持退货的情形",
+    "expectedKeywords": ["定制类商品", "生鲜类商品", "数码产品"],
+    "referenceAnswer": "定制类、生鲜类及部分已拆封数码产品不支持无理由退货。"
+  },
+  {
+    "id": "refund-custom-products",
+    "question": "定制商品可以无理由退货吗？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "不支持退货的情形",
+    "expectedKeywords": ["定制类商品", "不支持"],
+    "referenceAnswer": "定制类商品不支持无理由退货。"
+  },
+  {
+    "id": "refund-opened-digital",
+    "question": "拆封后影响二次销售的数码产品能退吗？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "不支持退货的情形",
+    "expectedKeywords": ["已拆封", "影响二次销售", "不支持"],
+    "referenceAnswer": "已拆封且影响二次销售的数码产品不支持退货。"
+  },
+  {
+    "id": "refund-processing-time",
+    "question": "退款审核通过后多久原路退回？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "退款时效",
+    "expectedKeywords": ["3 个工作日", "原路退回"],
+    "referenceAnswer": "退货入库审核通过后，退款将在 3 个工作日内原路退回。"
+  },
+  {
+    "id": "refund-return-freight",
+    "question": "非质量问题的无理由退货，运费由谁承担？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "运费承担",
+    "expectedKeywords": ["非质量问题", "客户承担"],
+    "referenceAnswer": "非质量问题的无理由退货，往返运费由客户承担。"
+  },
+  {
+    "id": "refund-quality-freight",
+    "question": "质量问题导致的退货运费谁承担？",
+    "expectedSource": "refund-policy.md",
+    "expectedHeading": "运费承担",
+    "expectedKeywords": ["质量问题", "平台承担"],
+    "referenceAnswer": "质量问题导致的退货，运费由平台承担。"
+  },
+  {
+    "id": "it-wifi-login",
+    "question": "员工使用什么账号登录公司 Wi-Fi？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "办公网络",
+    "expectedKeywords": ["公司邮箱账号", "公司 Wi-Fi"],
+    "referenceAnswer": "员工使用公司邮箱账号登录公司 Wi-Fi。"
+  },
+  {
+    "id": "it-guest-wifi",
+    "question": "访客网络主要给谁使用？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "办公网络",
+    "expectedKeywords": ["访客网络", "来访客户"],
+    "referenceAnswer": "访客网络仅供来访客户使用。"
+  },
+  {
+    "id": "it-vpn-validity",
+    "question": "VPN 账号有效期是多少天？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "办公网络",
+    "expectedKeywords": ["VPN", "90 天"],
+    "referenceAnswer": "VPN 账号有效期为 90 天。"
+  },
+  {
+    "id": "it-software-install",
+    "question": "研发常用开发工具怎么安装？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "软件安装",
+    "expectedKeywords": ["自助申请安装"],
+    "referenceAnswer": "研发常用开发工具可自助申请安装。"
+  },
+  {
+    "id": "it-commercial-software",
+    "question": "商业授权软件安装需要走什么流程？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "软件安装",
+    "expectedKeywords": ["采购申请", "说明用途"],
+    "referenceAnswer": "商业授权软件需提交采购申请并说明用途。"
+  },
+  {
+    "id": "it-password-length",
+    "question": "公司密码长度至少多少位？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "账号与密码",
+    "expectedKeywords": ["12 位"],
+    "referenceAnswer": "密码长度不少于 12 位。"
+  },
+  {
+    "id": "it-password-rotation",
+    "question": "密码需要多久更换一次？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "账号与密码",
+    "expectedKeywords": ["180 天"],
+    "referenceAnswer": "密码每 180 天更换一次。"
+  },
+  {
+    "id": "it-password-reset",
+    "question": "忘记密码后怎么重置？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "账号与密码",
+    "expectedKeywords": ["IT 服务台", "工牌", "临时密码"],
+    "referenceAnswer": "通过 IT 服务台重置，携带工牌领取临时密码。"
+  },
+  {
+    "id": "it-first-login-password",
+    "question": "初始密码首次登录需要做什么？",
+    "expectedSource": "it-support.txt",
+    "expectedHeading": "账号与密码",
+    "expectedKeywords": ["首次登录", "必须修改"],
+    "referenceAnswer": "初始密码首次登录必须修改。"
+  }
+]

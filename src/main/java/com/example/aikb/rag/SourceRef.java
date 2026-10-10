@@ -35,4 +35,18 @@ public class SourceRef {
 
     /** 人类可读定位，如 {@code employee-handbook.md · 员工手册 > 年假 · 第 2 段} */
     private String location;
+
+    /** 向量检索原始分数（仅 hybrid / hybrid-rerank 模式可能为空） */
+    private Double vectorScore;
+
+    /** BM25 关键词检索原始分数（仅 hybrid / hybrid-rerank 模式可能为空） */
+    private Double lexicalScore;
+
+    /** 本条来源采用的检索模式 */
+    private String retrievalMode;
+
+    public SourceRef(String label, String source, int chunk, String heading,
+                     double score, String snippet, String location) {
+        this(label, source, chunk, heading, score, snippet, location, null, null, null);
+    }
 }

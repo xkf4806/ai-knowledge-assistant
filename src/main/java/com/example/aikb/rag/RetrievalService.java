@@ -7,19 +7,16 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * 向量检索服务（第 3 周学习重点：向量检索工程化）。
+ * 检索服务：向量召回、BM25 混合召回与候选重排（第 4 周升级）。
  *
- * <p>把「构建检索请求 → 相似度检索 → 组装带来源的命中片段」从 {@link RagService} 里拆出来，
- * 一方面职责更单一，另一方面它不依赖大模型，可以用假的 {@link VectorStore} 做单元测试。
- *
- * <p>支持两点工程化的检索能力：
- * <ul>
- *   <li>{@code topK}：返回片段数量由 {@code app.rag.top-k} 控制，越大上下文越全但 token 越贵；</li>
- *   <li>元数据过滤：按 {@code source}（文件名）限定检索范围，避免不同文档相互污染。</li>
- * </ul>
+ * <p>{@link RetrievalMode#VECTOR} 保留第 3 周行为，作为评测基线；
+ * 默认的 {@link RetrievalMode#HYBRID_RERANK} 先各取候选，再按两路排名、关键词覆盖率和标题匹配度重排。
+ * 这样既保留向量检索的语义能力，也能修复订单号、专有名词、数字条件等精确词项的召回。
  */
 @Slf4j
 @Service
@@ -30,22 +27,76 @@ public class RetrievalService {
 
     private final VectorStore vectorStore;
     private final RagProperties properties;
+    private final LexicalIndex lexicalIndex;
+    private final RerankService rerankService;
 
-    public RetrievalService(VectorStore vectorStore, RagProperties properties) {
+    public RetrievalService(VectorStore vectorStore,
+                            RagProperties properties,
+                            LexicalIndex lexicalIndex,
+                            RerankService rerankService) {
         this.vectorStore = vectorStore;
         this.properties = properties;
+        this.lexicalIndex = lexicalIndex;
+        this.rerankService = rerankService;
+    }
+
+    /** 按 application.yml 的默认模式检索。 */
+    public List<RetrievedChunk> retrieve(String question, String sourceFilter) {
+        return retrieve(question, sourceFilter, properties.getRetrievalMode());
     }
 
     /**
-     * 检索与问题最相关的片段。
+     * 按指定模式检索与问题最相关的片段。
      *
      * @param question     用户问题
-     * @param sourceFilter 可选：只在该文件名范围内检索（元数据过滤）；为空表示全库检索
+     * @param sourceFilter 可选：只在该文件名范围内检索（元数据过滤）
+     * @param mode         检索模式；评测可显式传 vector / hybrid / hybrid-rerank
      */
-    public List<RetrievedChunk> retrieve(String question, String sourceFilter) {
+    public List<RetrievedChunk> retrieve(String question, String sourceFilter, RetrievalMode mode) {
+        RetrievalMode resolvedMode = mode == null ? properties.getRetrievalMode() : mode;
+        if (resolvedMode == RetrievalMode.VECTOR) {
+            List<Document> hits = vectorSearch(question, sourceFilter, properties.getTopK());
+            return toRetrievedChunks(hits, resolvedMode, Map.of());
+        }
+
+        int candidateK = Math.max(properties.getTopK(), properties.getCandidateK());
+        List<Document> vectorHits = vectorSearch(question, sourceFilter, candidateK);
+        List<LexicalHit> lexicalHits = lexicalIndex.search(question, sourceFilter, candidateK);
+        if (vectorHits.isEmpty() && lexicalHits.isEmpty()) {
+            log.info("混合检索未命中任何片段{}",
+                    sourceFilter == null || sourceFilter.isBlank() ? "" : "（限定文档：" + sourceFilter + "）");
+            return List.of();
+        }
+
+        Map<String, RerankService.Candidate> candidates = mergeCandidates(vectorHits, lexicalHits);
+        List<RerankService.RankedDocument> ranked = resolvedMode == RetrievalMode.HYBRID
+                ? rerankService.fuseHybrid(new ArrayList<>(candidates.values()), properties.getTopK())
+                : rerankService.rerank(question, new ArrayList<>(candidates.values()), properties.getTopK());
+
+        List<RetrievedChunk> chunks = new ArrayList<>(ranked.size());
+        for (int i = 0; i < ranked.size(); i++) {
+            RerankService.RankedDocument rankedDocument = ranked.get(i);
+            RerankService.Candidate candidate = candidates.get(keyOf(rankedDocument.document()));
+            int index = i + 1;
+            double finalScore = round(rankedDocument.score());
+            chunks.add(new RetrievedChunk(
+                    index,
+                    rankedDocument.document().getText(),
+                    finalScore,
+                    toSourceRef(index, rankedDocument.document(), finalScore, resolvedMode, candidate)));
+        }
+        log.info("混合检索命中 {} 个片段，模式={}，候选数={}{}",
+                chunks.size(),
+                resolvedMode.wireName(),
+                candidates.size(),
+                sourceFilter == null || sourceFilter.isBlank() ? "" : "（限定文档：" + sourceFilter + "）");
+        return chunks;
+    }
+
+    private List<Document> vectorSearch(String question, String sourceFilter, int topK) {
         SearchRequest.Builder request = SearchRequest.builder()
                 .query(question)
-                .topK(properties.getTopK());
+                .topK(topK);
         if (sourceFilter != null && !sourceFilter.isBlank()) {
             request.filterExpression("source == '" + escape(sourceFilter.trim()) + "'");
         }
@@ -54,20 +105,60 @@ public class RetrievalService {
         if (hits == null || hits.isEmpty()) {
             return List.of();
         }
+        return hits;
+    }
 
+    private Map<String, RerankService.Candidate> mergeCandidates(List<Document> vectorHits,
+                                                                  List<LexicalHit> lexicalHits) {
+        Map<String, RerankService.Candidate> candidates = new LinkedHashMap<>();
+        for (int i = 0; i < vectorHits.size(); i++) {
+            Document document = vectorHits.get(i);
+            String key = keyOf(document);
+            RerankService.Candidate existing = candidates.get(key);
+            candidates.put(key, new RerankService.Candidate(
+                    document,
+                    i + 1,
+                    scoreOf(document),
+                    existing == null ? null : existing.lexicalRank(),
+                    existing == null ? 0 : existing.lexicalScore()));
+        }
+        for (int i = 0; i < lexicalHits.size(); i++) {
+            LexicalHit hit = lexicalHits.get(i);
+            Document document = hit.document();
+            String key = keyOf(document);
+            RerankService.Candidate existing = candidates.get(key);
+            candidates.put(key, new RerankService.Candidate(
+                    document,
+                    existing == null ? null : existing.vectorRank(),
+                    existing == null ? 0 : existing.vectorScore(),
+                    i + 1,
+                    hit.score()));
+        }
+        return candidates;
+    }
+
+    private List<RetrievedChunk> toRetrievedChunks(List<Document> hits,
+                                                   RetrievalMode mode,
+                                                   Map<String, RerankService.Candidate> candidates) {
         List<RetrievedChunk> chunks = new ArrayList<>(hits.size());
         for (int i = 0; i < hits.size(); i++) {
             Document hit = hits.get(i);
             int index = i + 1;
             double score = round(scoreOf(hit));
-            chunks.add(new RetrievedChunk(index, hit.getText(), score, toSourceRef(index, hit, score)));
+            chunks.add(new RetrievedChunk(
+                    index,
+                    hit.getText(),
+                    score,
+                    toSourceRef(index, hit, score, mode, candidates.get(keyOf(hit)))));
         }
-        log.info("检索到 {} 个片段{}", chunks.size(),
-                sourceFilter == null || sourceFilter.isBlank() ? "" : "（限定文档：" + sourceFilter + "）");
         return chunks;
     }
 
-    private SourceRef toSourceRef(int index, Document document, double score) {
+    private SourceRef toSourceRef(int index,
+                                  Document document,
+                                  double score,
+                                  RetrievalMode mode,
+                                  RerankService.Candidate candidate) {
         String source = stringMetadata(document, "source", "未知文档");
         int chunk = intMetadata(document, "chunk", -1);
         String heading = stringMetadata(document, "heading", null);
@@ -78,7 +169,14 @@ public class RetrievalService {
                 heading,
                 score,
                 snippet(document.getText()),
-                location(source, chunk, heading));
+                location(source, chunk, heading),
+                candidate == null || candidate.vectorRank() == null
+                        ? (mode == RetrievalMode.VECTOR ? score : null)
+                        : round(candidate.vectorScore()),
+                candidate == null || candidate.lexicalRank() == null
+                        ? null
+                        : round(candidate.lexicalScore()),
+                mode.wireName());
     }
 
     /** 「员工手册.md · 员工手册 > 年假 · 第 2 段」这样一眼能定位到原文的字符串。 */
@@ -103,7 +201,7 @@ public class RetrievalService {
                 : flattened.substring(0, SNIPPET_LENGTH) + "...";
     }
 
-    /** 优先用 Spring AI 返回的分数，取不到时回落到元数据里的 score/distance。 */
+    /** 优先用 Spring AI 返回的分数，取不到时回落到元数据里的 score。 */
     static double scoreOf(Document document) {
         Double score = document.getScore();
         if (score != null) {
@@ -114,6 +212,11 @@ public class RetrievalService {
             return number.doubleValue();
         }
         return 0.0;
+    }
+
+    private static String keyOf(Document document) {
+        return stringMetadata(document, "source", "") + '\u0000'
+                + intMetadata(document, "chunk", -1);
     }
 
     private static String stringMetadata(Document document, String key, String fallback) {

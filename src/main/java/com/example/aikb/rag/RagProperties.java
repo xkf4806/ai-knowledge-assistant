@@ -21,6 +21,23 @@ public class RagProperties {
     /** 检索返回的片段数量 */
     private int topK = 4;
 
+    /** 默认检索模式：vector（基线）/ hybrid（RRF）/ hybrid-rerank（第 4 周默认） */
+    private RetrievalMode retrievalMode = RetrievalMode.HYBRID_RERANK;
+
+    /**
+     * 混合召回候选数。最终展示仍只保留 topK，但两路先各取更多候选再融合，
+     * 给关键词命中和重排留出翻盘空间。
+     */
+    private int candidateK = 12;
+
+    /** 加权 RRF 的两路权重：向量为主，BM25 负责关键词翻盘。 */
+    private double rerankVectorWeight = 0.70;
+    private double rerankLexicalWeight = 0.30;
+
+    /** 覆盖率与标题匹配只做微小 tie-break，实际权重会再乘 FEATURE_SCALE。 */
+    private double rerankCoverageWeight = 0.10;
+    private double rerankHeadingWeight = 0.20;
+
     /** 示例文档位置，支持 Spring Resource 通配符 */
     private String sampleDocs = "classpath:sample-docs/*";
 

@@ -18,6 +18,7 @@ public class TextSplitter {
 
     /** Markdown 与常见纯文本标题：# 到 ###### + 空格 + 标题 */
     private static final Pattern HEADING = Pattern.compile("^(#{1,6})\\s+(.+?)\\s*$");
+    private static final Pattern HEADING_END_PUNCTUATION = Pattern.compile(".*[。！？；，,：:;!?].*$");
 
     public List<TextChunk> split(String text, ChunkingOptions options) {
         String normalized = normalize(text);
@@ -89,6 +90,8 @@ public class TextSplitter {
         List<Section> sections = new ArrayList<>();
         List<Heading> stack = new ArrayList<>();
         StringBuilder body = new StringBuilder();
+        boolean previousLineBlank = true;
+        int plainHeadingCount = 0;
         for (String line : text.split("\n", -1)) {
             Matcher matcher = HEADING.matcher(line);
             if (matcher.matches()) {
@@ -99,12 +102,34 @@ public class TextSplitter {
                     stack.remove(stack.size() - 1);
                 }
                 stack.add(new Heading(level, title));
+            } else if (isPlainTextHeading(line, previousLineBlank)) {
+                flush(sections, stack, body);
+                int level = plainHeadingCount++ == 0 ? 1 : 2;
+                while (!stack.isEmpty() && stack.get(stack.size() - 1).level() >= level) {
+                    stack.remove(stack.size() - 1);
+                }
+                stack.add(new Heading(level, line.trim()));
             } else {
                 body.append(line).append('\n');
             }
+            previousLineBlank = line.isBlank();
         }
         flush(sections, stack, body);
         return sections;
+    }
+
+    /**
+     * 纯文本文档没有 Markdown 标记，用「空行分隔 + 短行 + 无句末标点」识别小节标题。
+     * 首个纯文本标题视为文档标题，后续标题视为二级小节，拼出「文档 > 小节」路径。
+     */
+    private static boolean isPlainTextHeading(String line, boolean previousLineBlank) {
+        if (!previousLineBlank) {
+            return false;
+        }
+        String title = line == null ? "" : line.trim();
+        return !title.isEmpty()
+                && title.length() <= 24
+                && !HEADING_END_PUNCTUATION.matcher(title).matches();
     }
 
     private static void flush(List<Section> sections, List<Heading> stack, StringBuilder body) {

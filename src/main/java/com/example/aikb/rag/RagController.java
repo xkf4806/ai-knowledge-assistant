@@ -31,13 +31,16 @@ public class RagController {
     private final IngestionService ingestionService;
     private final RagProperties properties;
     private final ConversationMemoryService memory;
+    private final LexicalIndex lexicalIndex;
 
     public RagController(RagService ragService, IngestionService ingestionService,
-                         RagProperties properties, ConversationMemoryService memory) {
+                         RagProperties properties, ConversationMemoryService memory,
+                         LexicalIndex lexicalIndex) {
         this.ragService = ragService;
         this.ingestionService = ingestionService;
         this.properties = properties;
         this.memory = memory;
+        this.lexicalIndex = lexicalIndex;
     }
 
     /**
@@ -118,6 +121,9 @@ public class RagController {
                 ? properties.getVectorTableName() : null);
         body.put("embeddingDimensions", properties.getEmbeddingDimensions());
         body.put("topK", properties.getTopK());
+        body.put("retrievalMode", properties.getRetrievalMode().wireName());
+        body.put("candidateK", properties.getCandidateK());
+        body.put("lexicalIndexSize", lexicalIndex.size());
         body.put("chunkStrategy", properties.getChunkStrategy().wireName());
         body.put("memoryMaxMessages", memory.maxMessages());
         body.put("activeSessions", memory.sessionIds().size());

@@ -30,6 +30,7 @@ class RagSessionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vectorStore").value("memory"))
                 .andExpect(jsonPath("$.topK").value(4))
+                .andExpect(jsonPath("$.retrievalMode").value("hybrid-rerank"))
                 .andExpect(jsonPath("$.chunkStrategy").value("heading"));
     }
 

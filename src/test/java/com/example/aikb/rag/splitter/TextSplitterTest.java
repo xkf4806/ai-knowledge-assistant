@@ -57,6 +57,26 @@ class TextSplitterTest {
     }
 
     @Test
+    void headingSplitRecognizesPlainTextSections() {
+        String text = """
+                IT 支持与账号管理（节选）
+
+                办公网络
+                员工使用公司邮箱账号登录 Wi-Fi。
+
+                软件安装
+                商业授权软件需提交采购申请。
+                """;
+
+        List<TextChunk> chunks = splitter.split(
+                text, new ChunkingOptions(ChunkingStrategy.HEADING, 200, 20));
+
+        assertThat(chunks).hasSize(2);
+        assertThat(chunks.get(0).heading()).isEqualTo("IT 支持与账号管理（节选） > 办公网络");
+        assertThat(chunks.get(1).heading()).isEqualTo("IT 支持与账号管理（节选） > 软件安装");
+    }
+
+    @Test
     void paragraphSplitPacksSmallParagraphsUpToTargetSize() {
         String text = """
                 第一段内容。

@@ -15,7 +15,7 @@
     <artifactId>ai-knowledge-assistant</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>ai-knowledge-assistant</name>
-    <description>企业知识库智能助手 - Spring AI + RAG（第 1–3 周：最小闭环 / 解析分块 / 检索工程化）</description>
+    <description>企业知识库智能助手 - Spring AI + RAG（第 1–4 周：最小闭环 / 解析分块 / 检索工程化 / 评测优化）</description>
 
     <properties>
         <java.version>17</java.version>

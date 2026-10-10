@@ -1,0 +1,57 @@
+{
+  "evaluatedAt": "2026-10-10",
+  "datasetSize": 26,
+  "retrieval": [
+    {
+      "mode": "vector",
+      "hitRate": 1.0,
+      "mrr": 1.0,
+      "precisionAtK": 0.25,
+      "averageLatencyMs": 123.38
+    },
+    {
+      "mode": "hybrid",
+      "hitRate": 1.0,
+      "mrr": 1.0,
+      "precisionAtK": 0.25,
+      "averageLatencyMs": 125.85
+    },
+    {
+      "mode": "hybrid-rerank",
+      "hitRate": 1.0,
+      "mrr": 1.0,
+      "precisionAtK": 0.25,
+      "averageLatencyMs": 126.35
+    }
+  ],
+  "answerEvaluation": [
+    {
+      "mode": "vector",
+      "answerAccuracy": 0.7692,
+      "citationAccuracy": 1.0,
+      "averageLatencyMs": 2065.81,
+      "failedCaseIds": [
+        "hr-annual-leave-increase",
+        "hr-annual-leave-cap",
+        "hr-reimbursement-deadline",
+        "refund-return-window",
+        "refund-custom-products",
+        "refund-opened-digital"
+      ]
+    },
+    {
+      "mode": "hybrid-rerank",
+      "answerAccuracy": 0.8462,
+      "citationAccuracy": 1.0,
+      "averageLatencyMs": 2217.96,
+      "failedCaseIds": [
+        "hr-annual-leave-cap",
+        "hr-reimbursement-deadline",
+        "refund-return-window",
+        "refund-opened-digital"
+      ]
+    }
+  ],
+  "answerAccuracyDelta": 0.077,
+  "fullLatencyDeltaMs": 152.15
+}

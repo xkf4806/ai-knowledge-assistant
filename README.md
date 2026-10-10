@@ -1,9 +1,10 @@
-# 企业知识库智能助手（第 1–3 周：最小 RAG 闭环 + 文档解析与分块 + 向量检索工程化）
+# 企业知识库智能助手（第 1–4 周：RAG 闭环 + 分块 + 检索工程化 + 评测优化）
 
-这是 8 周求职路线图的第 1–3 周产物：一个能跑通的 **Spring AI + RAG** 后端骨架。
+这是 8 周求职路线图的第 1–4 周产物：一个能跑通、能评测、能持续优化的 **Spring AI + RAG** 后端骨架。
 第 1 周先把「文档 → 向量 → 检索 → 大模型生成」这条链路跑起来，看清 RAG 的每一步；
 第 2 周补上**真实文档解析**与**可配置分块策略**，让系统不再只能吃手写的示例文本；
-第 3 周做**向量检索工程化**：接入 pgvector 持久化、给答案加**引用溯源**、给对话加**多轮记忆**。
+第 3 周做**向量检索工程化**：接入 pgvector 持久化、给答案加**引用溯源**、给对话加**多轮记忆**；
+第 4 周做**RAG 评测与优化**：建立 26 条问题的评测集，引入 BM25 混合召回与重排，用数据对比优化前后。
 
 ## 技术栈
 
@@ -18,6 +19,8 @@
 | 文档解析 | Apache Tika 3.2.3（PDF / Word / Markdown / HTML / txt 等） |
 | 分块策略 | `fixed` / `heading` / `paragraph`，参数可配置 |
 | 会话记忆 | Spring AI `ChatMemory` + `MessageWindowChatMemory`（第 3 周新增，滑动窗口） |
+| 检索优化 | `vector` 基线 / `hybrid`（BM25 + 向量，RRF）/ `hybrid-rerank`（第 4 周默认） |
+| RAG 评测 | 26 条内置评测集；Hit Rate、MRR、Precision@K、可选答案与引用准确率 |
 
 ## 目录结构
 
@@ -33,8 +36,12 @@ src/main/java/com/example/aikb
 ├── rag/                                   # RAG 核心
 │   ├── RagController.java                 # /ingest、/upload、/preview、/ask、/status、/sessions
 │   ├── RagService.java                    # 检索 + 编号上下文 + 生成 + 引用校验 + 记忆写入
-│   ├── RetrievalService.java              # 第 3 周：向量检索 + 元数据过滤 + 来源组装
+│   ├── RetrievalService.java              # 第 4 周：vector / hybrid / hybrid-rerank 三档检索
 │   ├── RetrievedChunk.java / SourceRef.java  # 第 3 周：带来源/分数/定位的命中片段
+│   ├── RetrievalMode.java                 # 第 4 周：检索模式枚举
+│   ├── Bm25LexicalIndex.java              # 第 4 周：中文二元词 + BM25 关键词索引
+│   ├── RerankService.java                 # 第 4 周：RRF 融合与确定性重排
+│   ├── eval/                              # 第 4 周：评测集、指标与评测接口
 │   ├── IngestionService.java              # 解析 -> 分块 -> 按来源先删后写向量库；preview 只分块
 │   ├── IngestResponse.java                # 含 documents / chunks / strategy / sources
 │   ├── PreviewResponse.java / ChunkPreview.java / StrategyPreview.java
@@ -57,8 +64,10 @@ src/main/java/com/example/aikb
 src/main/resources
 ├── application.yml                        # 模型、RAG、上传大小配置
 ├── prompts/system-prompt.txt              # 系统提示词（UTF-8，独立于源码）
+├── evaluation/rag-eval.json               # 第 4 周：26 条评测问题与标准来源
 └── sample-docs/                           # 三个示例文档（Markdown + txt）
 docker-compose.yml                         # 第 3 周：一键起 pgvector（PostgreSQL + vector 扩展）
+scripts/                                   # 第 4 周：一键跑 RAG 评测
 ```
 
 ## 快速开始
@@ -153,7 +162,7 @@ AIKB_VECTOR_STORE=pgvector ./build.sh spring-boot:run
 
 ```bash
 curl http://localhost:8080/api/rag/status
-# {"vectorStore":"pgvector","vectorTable":"ai_kb_vectors","embeddingDimensions":1024,...}
+# {"vectorStore":"pgvector","retrievalMode":"hybrid-rerank","candidateK":12,"lexicalIndexSize":11,...}
 ```
 
 ### 6. 多轮对话与引用溯源（第 3 周）
@@ -183,6 +192,40 @@ curl -X POST http://localhost:8080/api/rag/ask \
   -d '{"question":"退货期限是几天？","source":"refund-policy.md"}'
 ```
 
+本次提问也可以临时覆盖检索模式，方便对比同一问题的召回差异：
+
+```bash
+curl -X POST http://localhost:8080/api/rag/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"VPN 账号有效期是多少天？","retrievalMode":"vector"}'
+```
+
+### 7. RAG 评测与优化前后对比（第 4 周）
+
+先导入示例文档，再跑评测。默认一次对比三种检索模式，不调用对话模型：
+
+```bash
+curl -X POST http://localhost:8080/api/rag/ingest
+./scripts/evaluate-rag.sh
+```
+
+Windows PowerShell：
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8080/api/rag/ingest | Out-Null
+.\scripts\evaluate-rag.ps1
+```
+
+返回每种模式的 `hitRate`、`mrr`、`precisionAtK` 与逐题明细。需要把答案质量一起纳入评测时：
+
+```bash
+AIKB_EVAL_ANSWERS=true ./scripts/evaluate-rag.sh
+```
+
+> 开启 `includeAnswers` 后会逐题调用对话模型，产生真实费用；默认只跑检索指标。
+
+评测口径、结果表和复盘模板见 [`docs/week4-evaluation.md`](docs/week4-evaluation.md)。
+
 ## 接口一览
 
 | 方法 | 路径 | 说明 | 需要 Key |
@@ -196,6 +239,8 @@ curl -X POST http://localhost:8080/api/rag/ask \
 | POST | `/api/rag/ask` | 基于知识库提问，支持 `sessionId` 多轮与 `source` 元数据过滤 | 是 |
 | DELETE | `/api/rag/sessions/{sessionId}` | 清空某个会话的对话记忆 | 否 |
 | GET | `/api/rag/status` | 当前向量库/检索/记忆参数 | 否 |
+| GET | `/api/rag/eval/dataset` | 查看第 4 周评测问题、期望来源与标准答案 | 否 |
+| POST | `/api/rag/eval` | 对比多种检索模式的 Hit Rate / MRR / Precision@K | 是（embedding） |
 
 ## 第 2 周：文档解析与分块（Chunking）
 
@@ -273,6 +318,55 @@ curl -X POST http://localhost:8080/api/rag/preview \
 `IngestionService` 在写入前先按 `source` 删除旧片段（元数据过滤删除），
 避免同一份文档被索引多遍后检索结果里出现大量重复内容。
 
+## 第 4 周：RAG 评测与优化
+
+第 1–3 周解决的是「能跑」，第 4 周解决的是「怎么用数据证明它变好了」。本周新增：
+
+- `vector`：只走向量检索，保留为优化前基线；
+- `hybrid`：向量召回 + BM25 关键词召回，用 RRF 融合两路排名；
+- `hybrid-rerank`：在混合召回候选上，用加权 RRF 排序，再用问题词覆盖率和标题匹配度做微调；
+- 26 条评测问题：覆盖员工手册、退款政策、IT 支持，记录期望文档、期望标题和标准答案；
+- 检索指标：Hit Rate、MRR、Precision@K；可选答案准确率与引用准确率。
+
+### 1. 为什么加 BM25
+
+向量检索擅长语义相近，但订单号、产品名、数字条件和专有名词可能被泛化掉。
+BM25 对精确词项更敏感，两路候选合并后再排序，能补足单一向量检索的盲区。
+
+`Bm25LexicalIndex` 没有额外引入分词服务：中文连续文本按“单字 + 相邻二元词”切分，
+英文和数字按单词切分，再用标准 BM25 公式打分。它更适合作为求职项目里可解释、可测试的轻量实现。
+
+### 2. 两阶段检索
+
+`RetrievalService` 的 `hybrid-rerank` 流程：
+
+1. 向量检索和 BM25 各取 `candidate-k` 个候选；
+2. 按 `source + chunk` 合并去重，保留两路排名与原始分数；
+3. `RerankService` 用加权 RRF 合并两路排名，再加入问题词覆盖率和标题匹配度做微小 tie-break；
+4. 截断到 `top-k`，写回 `SourceRef` 的来源、分数和检索模式。
+
+默认权重与候选数都在 `application.yml` 的 `app.rag.*` 下，可以按评测结果调参。
+本次样例集实测：检索指标三档均打满，完整答案准确率从 `76.92%` 提升到 `84.62%`，引用准确率保持 `100%`。
+
+### 3. 评测接口
+
+评测集在 [src/main/resources/evaluation/rag-eval.json](src/main/resources/evaluation/rag-eval.json)。
+
+```bash
+# 只跑检索指标，默认对比 vector / hybrid / hybrid-rerank
+curl -X POST http://localhost:8080/api/rag/eval \
+  -H "Content-Type: application/json" \
+  -d '{"modes":["vector","hybrid","hybrid-rerank"],"includeAnswers":false}'
+
+# 显式开启完整答案评测（会调用对话模型）
+curl -X POST http://localhost:8080/api/rag/eval \
+  -H "Content-Type: application/json" \
+  -d '{"modes":["vector","hybrid-rerank"],"includeAnswers":true}'
+```
+
+`includeAnswers=false` 时只计算检索指标；`includeAnswers=true` 时会检查答案是否覆盖标准关键事实，
+以及引用来源是否正确。优化前后结果填到 [`docs/week4-evaluation.md`](docs/week4-evaluation.md)。
+
 ## 切换模型供应商
 
 都用环境变量覆盖即可，无需改代码：
@@ -284,6 +378,7 @@ curl -X POST http://localhost:8080/api/rag/preview \
 | `AI_CHAT_MODEL` | 对话模型 | `deepseek-ai/DeepSeek-V3` |
 | `AI_EMBEDDING_MODEL` | Embedding 模型 | `BAAI/bge-m3` |
 | `AIKB_VECTOR_STORE` | 向量库实现：`memory` / `pgvector` | `memory` |
+| `AIKB_RETRIEVAL_MODE` | 检索模式：`vector` / `hybrid` / `hybrid-rerank` | `hybrid-rerank` |
 | `AIKB_DB_URL` | pgvector 的 JDBC 连接串 | `jdbc:postgresql://localhost:5432/aikb` |
 | `AIKB_DB_USERNAME` / `AIKB_DB_PASSWORD` | pgvector 数据库账号 | `aikb` / `aikb` |
 
@@ -321,6 +416,15 @@ curl -X POST http://localhost:8080/api/rag/preview \
 - [ ] 同一 `sessionId` 的两次提问能借助历史理解指代（多轮对话）
 - [ ] 重复导入同一文档不会产生重复片段（按来源先删后写）
 - [ ] `mvn test` 通过（含会话记忆、检索来源组装、引用校验、状态接口用例）
+
+### 第 4 周
+
+- [ ] `/api/rag/eval/dataset` 能返回 26 条评测问题、期望来源与标准答案
+- [ ] `/api/rag/eval` 能一次输出 `vector` / `hybrid` / `hybrid-rerank` 的 Hit Rate、MRR、Precision@K
+- [ ] `/api/rag/status` 能报告默认检索模式、候选数和 BM25 索引片段数
+- [ ] `/api/rag/ask` 能用 `retrievalMode` 临时切换检索模式做对照
+- [ ] 精确词项样例中，混合检索 + 重排能优先召回关键词候选
+- [ ] `mvn test` 通过（含 BM25、重排链路、评测指标用例）
 
 ## 你需要理解的关键点
 

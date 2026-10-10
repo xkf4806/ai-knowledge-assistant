@@ -35,13 +35,16 @@ public class IngestionService {
     private final RagProperties properties;
     private final DocumentParser documentParser;
     private final TextSplitter textSplitter;
+    private final LexicalIndex lexicalIndex;
 
     public IngestionService(VectorStore vectorStore, RagProperties properties,
-                            DocumentParser documentParser, TextSplitter textSplitter) {
+                            DocumentParser documentParser, TextSplitter textSplitter,
+                            LexicalIndex lexicalIndex) {
         this.vectorStore = vectorStore;
         this.properties = properties;
         this.documentParser = documentParser;
         this.textSplitter = textSplitter;
+        this.lexicalIndex = lexicalIndex;
     }
 
     /** 导入 classpath:sample-docs 下的示例文档，可用参数覆盖默认分块策略。 */
@@ -132,6 +135,13 @@ public class IngestionService {
         if (!documents.isEmpty()) {
             // 一次性批量写入，Spring AI 会对片段做批量 embedding，减少接口调用次数。
             vectorStore.add(documents);
+        }
+        // 第 4 周：关键词索引与向量库保持同一份片段集合，供 BM25 混合召回使用。
+        for (String source : sources) {
+            List<Document> sourceDocuments = documents.stream()
+                    .filter(document -> source.equals(document.getMetadata().get("source")))
+                    .toList();
+            lexicalIndex.replaceSource(source, sourceDocuments);
         }
         log.info("已索引 {} 个文档、{} 个片段，策略={}", sources.size(), documents.size(), options.strategy());
         return new IngestResponse(sources.size(), documents.size(), options.strategy().wireName(), sources);
