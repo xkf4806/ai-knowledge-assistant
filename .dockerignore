@@ -1,0 +1,12 @@
+target/
+.git/
+.gitattributes
+.idea/
+.vscode/
+*.iml
+*.log
+.env
+application-local.yml
+docs/
+scripts/
+README.md

@@ -1,0 +1,32 @@
+[
+  {
+    "sku": "SKU-1001",
+    "productName": "定制刻字保温杯",
+    "unitPrice": 199.00,
+    "customMade": true,
+    "stockByWarehouse": {
+      "上海仓": 12,
+      "北京仓": 3
+    }
+  },
+  {
+    "sku": "SKU-2002",
+    "productName": "无线蓝牙耳机",
+    "unitPrice": 499.00,
+    "customMade": false,
+    "stockByWarehouse": {
+      "上海仓": 40,
+      "广州仓": 25
+    }
+  },
+  {
+    "sku": "SKU-3003",
+    "productName": "纯棉四件套",
+    "unitPrice": 299.00,
+    "customMade": false,
+    "stockByWarehouse": {
+      "上海仓": 8,
+      "北京仓": 0
+    }
+  }
+]

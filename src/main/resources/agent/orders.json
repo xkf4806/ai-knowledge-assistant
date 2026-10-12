@@ -1,0 +1,58 @@
+[
+  {
+    "orderId": "A1001",
+    "customer": "张伟",
+    "sku": "SKU-1001",
+    "productName": "定制刻字保温杯",
+    "category": "定制商品",
+    "customMade": true,
+    "status": "已签收",
+    "amount": 199.00,
+    "quantity": 1,
+    "orderDate": "2026-10-01",
+    "deliveredDate": "2026-10-04",
+    "opened": false
+  },
+  {
+    "orderId": "A1002",
+    "customer": "李娜",
+    "sku": "SKU-2002",
+    "productName": "无线蓝牙耳机",
+    "category": "数码产品",
+    "customMade": false,
+    "status": "已签收",
+    "amount": 499.00,
+    "quantity": 1,
+    "orderDate": "2026-09-20",
+    "deliveredDate": "2026-09-24",
+    "opened": true
+  },
+  {
+    "orderId": "A1003",
+    "customer": "王强",
+    "sku": "SKU-3003",
+    "productName": "纯棉四件套",
+    "category": "家居",
+    "customMade": false,
+    "status": "已签收",
+    "amount": 299.00,
+    "quantity": 2,
+    "orderDate": "2026-10-05",
+    "deliveredDate": "2026-10-07",
+    "opened": false
+  },
+  {
+    "orderId": "A1004",
+    "customer": "赵敏",
+    "sku": "SKU-2002",
+    "productName": "无线蓝牙耳机",
+    "category": "数码产品",
+    "customMade": false,
+    "status": "运输中",
+    "amount": 499.00,
+    "quantity": 1,
+    "orderDate": "2026-10-09",
+    "deliveredDate": null,
+    "opened": false
+  }
+]

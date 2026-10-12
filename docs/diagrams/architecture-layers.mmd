@@ -1,0 +1,96 @@
+flowchart TB
+  subgraph CLIENT["调用方"]
+    UI["静态单页前端<br/>index.html + styles.css + app.js"]
+    CURL["curl / 评测脚本"]
+  end
+
+  subgraph WEB["HTTP 层"]
+    PING["GET /api/ping"]
+    CHATAPI["/api/chat<br/>/api/chat/stream"]
+    RAGAPI["/api/rag/ingest · upload · preview<br/>/api/rag/ask · ask/stream · status"]
+    EVALAPI["/api/rag/eval<br/>/api/rag/eval/dataset"]
+    AGENTAPI["/api/agent/ask · ask/stream<br/>/api/agent/plan · tools"]
+    OBSAPI["/api/observability/usage"]
+    EXH["ApiExceptionHandler<br/>参数/解析错误 → 400"]
+  end
+
+  subgraph APP["应用服务层"]
+    CHATSVC["ChatService<br/>阻塞与流式共用逻辑 + 会话记忆"]
+    RAGSVC["RagService<br/>检索 → 编号上下文 → 生成 → 引用校验"]
+    ING["IngestionService<br/>解析 → 分块 → 按来源先删后写"]
+    RET["RetrievalService<br/>vector / hybrid / hybrid-rerank"]
+    RRK["RerankService<br/>RRF 融合 + 确定性重排"]
+    AGENTSVC["AgentService<br/>规划 → 收敛工具 → 生成 → 记录"]
+    PLAN["AgentPlanner<br/>规则式分步（不调用模型）"]
+    POL["ToolExecutionPolicy<br/>超时 + 指数退避重试 + 兜底"]
+    OBS["ModelCallObserver<br/>token / 耗时 / 估算费用"]
+    SSE["SseStreams<br/>meta → delta × N → done"]
+  end
+
+  subgraph RAGINFRA["检索设施"]
+    PARSER["TikaDocumentParser<br/>+ TextSplitter"]
+    BM25["Bm25LexicalIndex<br/>中文二元词 + BM25"]
+    VSI["VectorStore 抽象"]
+    MVS["SimpleVectorStore<br/>内存（默认）"]
+    PGV["pgvector<br/>ai_kb_vectors 表"]
+  end
+
+  subgraph TOOLS["Agent 工具（@Tool）"]
+    T1["lookupOrder"]
+    T2["checkInventory"]
+    T3["quotePrice"]
+    T4["searchKnowledgeBase"]
+    BIZDATA["orders.json<br/>inventory.json"]
+  end
+
+  subgraph EXT["外部依赖"]
+    LLM["OpenAI 兼容网关<br/>对话 DeepSeek-V3 + 向量 bge-m3"]
+  end
+
+  UI --> CHATAPI
+  UI --> RAGAPI
+  UI --> AGENTAPI
+  UI --> OBSAPI
+  CURL --> RAGAPI
+  CURL --> EVALAPI
+  CURL --> AGENTAPI
+
+  CHATAPI --> CHATSVC
+  RAGAPI --> RAGSVC
+  RAGAPI --> ING
+  EVALAPI --> RAGSVC
+  AGENTAPI --> AGENTSVC
+  AGENTAPI --> PLAN
+
+  ING --> PARSER --> VSI
+  RAGSVC --> RET
+  RET --> RRK
+  RET --> BM25
+  RET --> VSI
+  VSI --> MVS
+  VSI --> PGV
+
+  AGENTSVC --> PLAN
+  AGENTSVC --> POL
+  POL --> T1
+  POL --> T2
+  POL --> T3
+  POL --> T4
+  T1 --> BIZDATA
+  T2 --> BIZDATA
+  T3 --> BIZDATA
+  T4 --> RET
+
+  CHATSVC --> SSE
+  RAGSVC --> SSE
+  AGENTSVC --> SSE
+  SSE --> UI
+
+  CHATSVC --> LLM
+  RAGSVC --> LLM
+  AGENTSVC --> LLM
+  VSI --> LLM
+  CHATSVC -.->|每次调用都记一条| OBS
+  RAGSVC -.-> OBS
+  AGENTSVC -.-> OBS
+  OBS --> OBSAPI

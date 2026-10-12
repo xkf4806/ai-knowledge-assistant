@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>企业知识库智能助手</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true">KB</span>
+            <span class="brand-text">
+                <strong>企业知识库智能助手</strong>
+                <small>RAG · Agent · 流式输出</small>
+            </span>
+        </div>
+
+        <div class="status-cluster">
+            <span class="chip" id="status-chip" title="后端连接状态">
+                <i data-lucide="loader" class="spin"></i><span id="status-text">连接中</span>
+            </span>
+            <span class="chip subtle" id="vector-chip" title="当前向量库与检索模式">
+                <i data-lucide="layers"></i><span id="vector-text">—</span>
+            </span>
+        </div>
+
+        <div class="topbar-actions">
+            <button type="button" class="btn ghost" id="btn-kb" title="知识库：导入与上传文档">
+                <i data-lucide="database"></i><span>知识库</span>
+            </button>
+            <button type="button" class="btn ghost" id="btn-usage" title="用量与调用追踪">
+                <i data-lucide="activity"></i><span>用量</span>
+            </button>
+            <button type="button" class="btn primary" id="btn-new" title="清空当前会话，开始新对话">
+                <i data-lucide="plus"></i><span>新会话</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="layout" id="layout">
+        <section class="chat">
+            <div class="messages" id="messages">
+                <div class="messages-inner" id="messages-inner"></div>
+            </div>
+
+            <form class="composer" id="composer" autocomplete="off">
+                <div class="composer-top">
+                    <div class="segmented" role="tablist" aria-label="问答模式">
+                        <button type="button" role="tab" data-mode="rag" aria-selected="true"
+                                title="知识库问答：基于内部文档作答并标注引用">
+                            <i data-lucide="book-open"></i><span>知识库问答</span>
+                        </button>
+                        <button type="button" role="tab" data-mode="agent" aria-selected="false"
+                                title="智能助手：可调用订单、库存、价格与知识库工具">
+                            <i data-lucide="wrench"></i><span>智能助手</span>
+                        </button>
+                        <button type="button" role="tab" data-mode="chat" aria-selected="false"
+                                title="基础对话：不接知识库的直接对话">
+                            <i data-lucide="message-square"></i><span>基础对话</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="composer-input">
+                    <textarea id="input" rows="1" placeholder="问点什么，例如：无理由退货的期限是几天？"></textarea>
+                    <div class="composer-buttons">
+                        <button type="submit" class="btn primary icon" id="btn-send" title="发送（Enter）">
+                            <i data-lucide="send"></i>
+                        </button>
+                        <button type="button" class="btn danger icon" id="btn-stop" title="停止生成" hidden>
+                            <i data-lucide="square"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="composer-foot">
+                    <label class="field" id="field-retrieval">
+                        <span>检索模式</span>
+                        <select id="retrieval-mode">
+                            <option value="">默认（服务端配置）</option>
+                            <option value="hybrid-rerank">hybrid-rerank</option>
+                            <option value="hybrid">hybrid</option>
+                            <option value="vector">vector</option>
+                        </select>
+                    </label>
+                    <label class="field" id="field-source">
+                        <span>限定文档</span>
+                        <input id="source-filter" type="text" placeholder="全部文档">
+                    </label>
+                    <span class="field-note" id="field-note"></span>
+                </div>
+            </form>
+        </section>
+
+        <aside class="panel" id="panel">
+            <div class="panel-head">
+                <h2><i data-lucide="activity"></i>用量与追踪</h2>
+                <div class="panel-actions">
+                    <button type="button" class="btn ghost icon" id="btn-usage-refresh" title="刷新用量">
+                        <i data-lucide="refresh-cw"></i>
+                    </button>
+                    <button type="button" class="btn ghost icon" id="btn-usage-reset" title="清零累计用量">
+                        <i data-lucide="rotate-ccw"></i>
+                    </button>
+                    <button type="button" class="btn ghost icon" id="btn-panel-close" title="收起面板">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="panel-body" id="panel-body"></div>
+        </aside>
+    </div>
+</div>
+
+<dialog id="kb-dialog" class="dialog">
+    <form method="dialog" class="dialog-head">
+        <h2><i data-lucide="database"></i>知识库</h2>
+        <button type="button" class="btn ghost icon" id="btn-kb-refresh" title="刷新知识库状态">
+            <i data-lucide="refresh-cw"></i>
+        </button>
+        <button type="button" class="btn ghost icon" id="btn-kb-cancel" title="取消等待" hidden>
+            <i data-lucide="circle-slash"></i>
+        </button>
+        <button type="submit" class="btn ghost icon" title="关闭">
+            <i data-lucide="x"></i>
+        </button>
+    </form>
+    <div class="dialog-body">
+        <div class="stat-grid" id="kb-stats"></div>
+
+        <div class="dialog-block">
+            <div class="block-head">
+                <h3>导入示例文档</h3>
+                <button type="button" class="btn primary" id="btn-ingest">
+                    <i data-lucide="download"></i><span>导入并索引</span>
+                </button>
+            </div>
+            <p class="block-note" id="ingest-note">把内置的员工手册、退款政策、IT 支持文档写入向量库。</p>
+        </div>
+
+        <div class="dialog-block">
+            <div class="block-head">
+                <h3>上传自己的文档</h3>
+            </div>
+            <div class="upload-row">
+                <input type="file" id="upload-file" accept=".pdf,.doc,.docx,.md,.markdown,.txt,.html,.htm,.csv,.xlsx,.pptx">
+                <label class="field">
+                    <span>分块策略</span>
+                    <select id="upload-strategy">
+                        <option value="">默认（服务端配置）</option>
+                        <option value="heading">heading</option>
+                        <option value="paragraph">paragraph</option>
+                        <option value="fixed">fixed</option>
+                    </select>
+                </label>
+                <button type="button" class="btn primary" id="btn-upload">
+                    <i data-lucide="upload"></i><span>上传并索引</span>
+                </button>
+            </div>
+            <pre class="result-box" id="kb-result" hidden></pre>
+        </div>
+    </div>
+</dialog>
+
+<script src="https://unpkg.com/lucide@0.446.0/dist/umd/lucide.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

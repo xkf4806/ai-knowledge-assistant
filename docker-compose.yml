@@ -1,0 +1,56 @@
+# 带 pgvector 扩展的 PostgreSQL，用于持久化向量库。
+# 再加一个 app 服务，做到「一条命令拉起全部服务」。
+#
+#   docker compose up -d --build     # 构建并启动 app + pgvector
+#   docker compose up -d pgvector    # 只起数据库（本地用 IDE 跑应用时用这条）
+#   docker compose down              # 停止（保留数据卷）
+#   docker compose down -v           # 停止并清空数据
+#
+# 模型 Key 通过环境变量或同目录的 .env 文件传入（见 .env.example）。
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: aikb-pgvector
+    environment:
+      POSTGRES_DB: aikb
+      POSTGRES_USER: aikb
+      POSTGRES_PASSWORD: aikb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aikb -d aikb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: ai-knowledge-assistant:latest
+    container_name: aikb-app
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    environment:
+      # 容器里的时区（日志时间戳、工具里「距收货多少天」都按它算）
+      TZ: ${TZ:-Asia/Shanghai}
+      # 模型网关：一个同时提供对话与 embedding 的 OpenAI 兼容接口
+      AI_API_KEY: ${AI_API_KEY:-sk-change-me}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.siliconflow.cn}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-deepseek-ai/DeepSeek-V3}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-BAAI/bge-m3}
+      # 容器里直接用 compose 网络里的 pgvector 服务名，并开启持久化向量库
+      AIKB_VECTOR_STORE: pgvector
+      AIKB_DB_URL: jdbc:postgresql://pgvector:5432/aikb
+      AIKB_DB_USERNAME: aikb
+      AIKB_DB_PASSWORD: aikb
+      AIKB_RETRIEVAL_MODE: ${AIKB_RETRIEVAL_MODE:-hybrid-rerank}
+      AIKB_PRICE_PROMPT_PER_1M: ${AIKB_PRICE_PROMPT_PER_1M:-2.0}
+      AIKB_PRICE_COMPLETION_PER_1M: ${AIKB_PRICE_COMPLETION_PER_1M:-8.0}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  pgvector-data:

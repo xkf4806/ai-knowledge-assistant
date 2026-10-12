@@ -1,0 +1,14 @@
+flowchart LR
+  DOC["文档<br/>PDF / Word / Markdown"] --> PARSE["Tika 解析 + 分块"] --> VEC["向量化"]
+  VEC --> VS[("向量库<br/>memory / pgvector")]
+  Q["用户提问"] --> RET["检索<br/>向量 + BM25 + 重排"]
+  VS --> RET
+  Q --> PLAN["规则式规划<br/>只暴露计划内工具"]
+  PLAN --> AGENT["Agent 编排<br/>Function Calling"]
+  AGENT --> TOOLS["工具：查订单 / 查库存 / 算价 / 查知识库"]
+  TOOLS --> RET
+  RET --> GEN["生成<br/>带引用编号"]
+  GEN --> SSE["SSE 流式输出<br/>meta -> delta x N -> done"]
+  AGENT --> SSE
+  SSE --> UI["单页前端<br/>引用角标 + 用量面板"]
+  OBS["ModelCallObserver<br/>token / 耗时 / 费用"] -.记录.-> SSE

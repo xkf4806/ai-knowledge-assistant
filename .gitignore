@@ -1,0 +1,11 @@
+target/
+.idea/
+*.iml
+.vscode/
+*.log
+.env
+application-local.yml
+
+# 原始录屏是大二进制文件（约 14 MB），不进版本库；用 scripts/demo/record-demo.cjs 可随时重新生成。
+# 仓库里保留的是 README 展示用的 demo.gif 与可下载的完整视频 demo.mp4
+docs/assets/demo.webm

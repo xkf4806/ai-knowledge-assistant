@@ -1,0 +1,140 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      # 支持上传真实文档，PDF/Word 会比纯文本大，适当放宽上传限制。
+      max-file-size: 20MB
+      max-request-size: 20MB
+  datasource:
+    # pgvector 持久化向量库使用。默认走内存向量库（app.rag.vector-store=memory）时
+    # 不会真正建立连接；把 app.rag.vector-store 切成 pgvector 后才会用到这些连接信息。
+    # 本地可用仓库根目录的 docker-compose.yml 一键起一个带 pgvector 的 PostgreSQL。
+    url: ${AIKB_DB_URL:jdbc:postgresql://localhost:5432/aikb}
+    username: ${AIKB_DB_USERNAME:aikb}
+    password: ${AIKB_DB_PASSWORD:aikb}
+    hikari:
+      # 容器里长时间空闲后，PostgreSQL / WSL 网络会先把空闲连接断掉，
+      # Hikari 校验时就报「This connection has been closed」。把连接最大存活时间压到
+      # 5 分钟并每 2 分钟保活一次，就不会再拿到已经死掉的连接。
+      maximum-pool-size: 10
+      minimum-idle: 1
+      connection-timeout: 10000
+      validation-timeout: 5000
+      idle-timeout: 180000
+      max-lifetime: 300000
+      keepalive-time: 120000
+  application:
+    name: ai-knowledge-assistant
+  ai:
+    retry:
+      # Spring AI 默认重试 10 次、退避最长 3 分钟（2s/10s/50s/180s…），
+      # 网关网络抖动时一次上传会「卡」好几分钟。这里收敛到「重试 1 次、最多等 2 秒」，
+      # 让失败尽快暴露成一个可读的错误，而不是让人一直等。
+      max-attempts: ${AIKB_MODEL_MAX_ATTEMPTS:2}
+      # 4xx（比如 401 Key 无效）不重试，重试没有意义
+      on-client-errors: false
+      backoff:
+        initial-interval: 500ms
+        multiplier: 2
+        max-interval: 2s
+    openai:
+      # Spring AI 的 base-url 使用「根地址」，不要带 /v1（客户端会自己拼接 /v1/...）。
+      # 默认指向硅基流动：一个同时提供「对话」和「Embedding」的 OpenAI 兼容网关，
+      # 默认对话模型就是 DeepSeek，一个 Key 即可跑通全链路。
+      #
+      # 若想改用 DeepSeek 官方 API（https://api.deepseek.com）：它只提供对话、不提供
+      # Embedding，需要另配一个 Embedding 服务（见 README「切换模型供应商」一节）。
+      base-url: ${AI_BASE_URL:https://api.siliconflow.cn}
+      api-key: ${AI_API_KEY:sk-change-me}
+      chat:
+        options:
+          model: ${AI_CHAT_MODEL:deepseek-ai/DeepSeek-V3}
+          temperature: 0.7
+          # 流式输出时要求网关在最后一段带上 token 用量，用于成本统计。
+          stream-usage: true
+      embedding:
+        options:
+          model: ${AI_EMBEDDING_MODEL:BAAI/bge-m3}
+
+app:
+  # 模型 HTTP 客户端的超时（见 config/HttpClientConfig）
+  ai-client:
+    # 默认走 HTTP/1.1：容器里用的是 JDK HttpClient，它默认 HTTP/2，而 WSL/docker NAT 上
+    # HTTP/2 长连接会静默卡死（实测 PROTOCOL_ERROR）。网关基本都是短请求 + SSE，HTTP/1.1 更稳。
+    use-http2: ${AIKB_AI_USE_HTTP2:false}
+    # 建立连接的超时：连不上就快速失败，不要干等操作系统的默认超时（Windows 约 21 秒）
+    connect-timeout-ms: ${AIKB_AI_CONNECT_TIMEOUT_MS:5000}
+    # 单次请求的读取超时：embedding 这类同步请求最多等这么久；流式输出走 WebClient，不受这里影响
+    read-timeout-ms: ${AIKB_AI_READ_TIMEOUT_MS:60000}
+  rag:
+    chunk-size: 300
+    chunk-overlap: 50
+    # fixed（固定长度）/ heading（按标题层级）/ paragraph（按段落合并）
+    chunk-strategy: heading
+    top-k: 4
+    # vector（基线）/ hybrid（向量 + BM25，RRF 融合）/ hybrid-rerank（再重排，默认）
+    retrieval-mode: ${AIKB_RETRIEVAL_MODE:hybrid-rerank}
+    # 两路先召回更多候选，最终仍只返回 top-k
+    candidate-k: 12
+    # 加权 RRF 两路权重：向量 0.70 + BM25 0.30
+    rerank-vector-weight: 0.70
+    rerank-lexical-weight: 0.30
+    # 覆盖率/标题匹配会乘 FEATURE_SCALE 后做 tie-break
+    rerank-coverage-weight: 0.10
+    rerank-heading-weight: 0.20
+    sample-docs: classpath:sample-docs/*
+    # memory（内存，默认）/ pgvector（持久化），可用环境变量覆盖
+    vector-store: ${AIKB_VECTOR_STORE:memory}
+    # 与 embedding 模型维度保持一致：BAAI/bge-m3 为 1024 维。换模型时这里要同步改。
+    embedding-dimensions: 1024
+    # pgvector 表名，Schema 由 PgVectorStore 自动初始化
+    vector-table-name: ai_kb_vectors
+  chat:
+    memory:
+      # 多轮对话记忆窗口，每个会话保留的最近消息条数（一问一答算 2 条）
+      max-messages: 10
+  agent:
+    # Function Calling / Tool Use（Agent 基础）
+    # 关掉后 /api/agent/ask 直接报错，方便对照演示「有工具 / 没工具」的差别
+    enabled: ${AIKB_AGENT_ENABLED:true}
+    # 单轮提问最多允许模型调用多少次工具，超出后拦截，避免模型反复调用停不下来
+    max-tool-calls: ${AIKB_AGENT_MAX_TOOL_CALLS:6}
+    # 按场景裁剪能力：把不想暴露的工具名加进来（例如 ["lookupOrder","quotePrice"]）
+    disabled-tools: []
+    # 工具执行健壮性（超时 + 重试 + 兜底）
+    resilience:
+      # 单个工具最多尝试几次（含首次）；1 表示不重试
+      max-attempts: ${AIKB_AGENT_MAX_ATTEMPTS:3}
+      # 第一次重试前的等待毫秒数，之后按 backoff-multiplier 指数退避
+      initial-backoff-ms: 50
+      backoff-multiplier: 2.0
+      # 单次工具调用超时毫秒数；<=0 表示关闭超时
+      timeout-ms: ${AIKB_AGENT_TOOL_TIMEOUT_MS:2000}
+      # 演示用故障注入：下面这些工具的前 N 次调用会被强制失败，用来现场演示重试与兜底
+      # 例如 ["lookupOrder"] + 2，就会看到 lookupOrder 失败两次后第三次成功
+      fault-injection-tools: []
+      fault-injection-failures: 0
+    # 规则式任务规划
+    planner:
+      # 关掉后不再生成计划，工具选择完全交给模型（对照演示用）
+      enabled: ${AIKB_AGENT_PLANNER_ENABLED:true}
+      # 只把计划内的工具交给模型（最小权限）；关掉后仍生成计划，但保留全部工具
+      restrict-tools: true
+  # SSE 流式输出（打字机效果）
+  stream:
+    # 单条 SSE 连接的最长存活时间毫秒数；<=0 表示不设超时
+    timeout-ms: ${AIKB_STREAM_TIMEOUT_MS:300000}
+    # 两次输出之间的最长静默时间（含第一个字）：超时就结束本轮并推 error 事件，避免界面一直转圈
+    idle-timeout-ms: ${AIKB_STREAM_IDLE_TIMEOUT_MS:90000}
+  # token 用量与成本统计（可观测性）
+  observability:
+    enabled: ${AIKB_OBSERVABILITY_ENABLED:true}
+    currency: CNY
+    # 下面两个单价是示例值，请按你所用模型供应商的价目表覆盖，否则费用仅供参考
+    prompt-price-per-1m: ${AIKB_PRICE_PROMPT_PER_1M:2.0}
+    completion-price-per-1m: ${AIKB_PRICE_COMPLETION_PER_1M:8.0}
+    # /api/observability/usage 返回的最近调用条数与进程内保留上限
+    recent-call-limit: 50
+    max-recent-calls: 200

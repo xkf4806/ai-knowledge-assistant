@@ -1,0 +1,13 @@
+flowchart LR
+  subgraph HOST["宿主机（开发 / 演示）"]
+    BROWSER["浏览器<br/>http://localhost:8080"]
+    subgraph COMPOSE["docker compose up -d --build"]
+      APP["app 容器<br/>eclipse-temurin:17-jre<br/>ai-knowledge-assistant jar"]
+      DB["pgvector 容器<br/>pgvector/pgvector:pg16"]
+    end
+  end
+  GATEWAY["OpenAI 兼容网关"]
+
+  BROWSER -->|"8080"| APP
+  APP -->|"jdbc:postgresql://pgvector:5432"| DB
+  APP -->|"HTTPS · HTTP/1.1"| GATEWAY
